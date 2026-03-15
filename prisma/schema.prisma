@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model OrderConfirmation {
+  id           String      @id @default(cuid())
+  orderId      String      @unique
+  phoneNumber  String
+  amount       Float
+  status       OrderStatus @default(PENDING)
+  deliverySlot String?
+  callSummary  String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+enum OrderStatus {
+  PENDING
+  CALLING
+  CONFIRMED
+  RESCHEDULED
+  CANCELLED
+  FAILED
+}
