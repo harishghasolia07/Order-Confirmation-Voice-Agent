@@ -10,6 +10,8 @@ AI-powered dashboard for Indian e-commerce brands to automatically confirm Cash-
 - Call result is sent back via webhook and updates the dashboard in real time
 - Analytics track confirmation rates and estimated RTO savings
 
+> See [FLOW.md](./FLOW.md) for the full system flow and voice call diagrams.
+
 ## Tech Stack
 
 | Layer | Technology |

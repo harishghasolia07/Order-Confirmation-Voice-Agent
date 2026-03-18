@@ -76,9 +76,18 @@ export async function updateOrderStatus(input: UpdateOrderStatusInput) {
 }
 
 export async function getAnalytics() {
-  const orders = await prisma.orderConfirmation.findMany({
-    select: { status: true, amount: true },
-  });
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+
+  const [orders, todayOrders] = await Promise.all([
+    prisma.orderConfirmation.findMany({
+      select: { status: true, amount: true },
+    }),
+    prisma.orderConfirmation.findMany({
+      where: { createdAt: { gte: startOfToday } },
+      select: { status: true },
+    }),
+  ]);
 
   const total = orders.length;
   const confirmed = orders.filter((o) => o.status === "CONFIRMED").length;
@@ -98,6 +107,12 @@ export async function getAnalytics() {
   const rtoReduced = Math.round(confirmed * 0.267);
   const estimatedSavings = Math.round(rtoReduced * avgOrderValue);
 
+  // Today's metrics
+  const todayCalls = todayOrders.filter((o) => o.status !== "PENDING").length;
+  const todayConfirmed = todayOrders.filter((o) => o.status === "CONFIRMED").length;
+  const todayConfirmationRate =
+    todayCalls > 0 ? Math.round((todayConfirmed / todayCalls) * 100) : 0;
+
   return {
     total,
     confirmed,
@@ -108,5 +123,7 @@ export async function getAnalytics() {
     confirmationRate,
     rtoReduced,
     estimatedSavings,
+    todayCalls,
+    todayConfirmationRate,
   };
 }

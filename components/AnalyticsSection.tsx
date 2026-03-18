@@ -14,6 +14,8 @@ import {
   PhoneCall,
   TrendingUp,
   PiggyBank,
+  CalendarDays,
+  Activity,
 } from "lucide-react";
 
 interface AnalyticsData {
@@ -26,6 +28,8 @@ interface AnalyticsData {
   confirmationRate: number;
   rtoReduced: number;
   estimatedSavings: number;
+  todayCalls: number;
+  todayConfirmationRate: number;
 }
 
 interface AnalyticsSectionProps {
@@ -64,7 +68,7 @@ function StatCard({ title, value, description, icon, colorClass }: StatCardProps
 export function AnalyticsSection({ data }: AnalyticsSectionProps) {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard
           title="Total Calls"
           value={data.totalCalls}
@@ -75,7 +79,7 @@ export function AnalyticsSection({ data }: AnalyticsSectionProps) {
         <StatCard
           title="Confirmed"
           value={data.confirmed}
-          description={`${data.confirmationRate}% confirmation rate`}
+          description={`${data.confirmationRate}% rate`}
           icon={<CheckCircle className="h-5 w-5 text-green-600" />}
           colorClass="text-green-600"
         />
@@ -90,6 +94,20 @@ export function AnalyticsSection({ data }: AnalyticsSectionProps) {
           value={data.rescheduled}
           icon={<Clock className="h-5 w-5 text-yellow-600" />}
           colorClass="text-yellow-600"
+        />
+        <StatCard
+          title="Calls Today"
+          value={data.todayCalls}
+          description="since midnight UTC"
+          icon={<CalendarDays className="h-5 w-5 text-purple-600" />}
+          colorClass="text-purple-600"
+        />
+        <StatCard
+          title="Today's Rate"
+          value={`${data.todayConfirmationRate}%`}
+          description="today's confirmation"
+          icon={<Activity className="h-5 w-5 text-indigo-600" />}
+          colorClass="text-indigo-600"
         />
       </div>
 

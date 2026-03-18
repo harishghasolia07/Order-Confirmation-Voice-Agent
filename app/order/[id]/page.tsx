@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getOrderByOrderId } from "@/services/order.service";
 import { StatusBadge } from "@/components/StatusBadge";
+import { RecallButton } from "@/components/RecallButton";
 import {
   Card,
   CardContent,
@@ -65,7 +66,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
 
         <Card>
           <CardHeader>
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between gap-4">
               <div>
                 <CardTitle className="font-mono text-xl">
                   {order.orderId}
@@ -81,7 +82,10 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                   })}
                 </CardDescription>
               </div>
-              <StatusBadge status={order.status} />
+              <div className="flex items-center gap-2 shrink-0">
+                <StatusBadge status={order.status} />
+                <RecallButton orderId={order.orderId} status={order.status} />
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">

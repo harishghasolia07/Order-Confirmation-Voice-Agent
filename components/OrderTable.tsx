@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -8,11 +9,13 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 import { OrderConfirmation } from "@prisma/client";
-import { ArrowUpDown, Search } from "lucide-react";
+import { ArrowUpDown, Search, PhoneCall, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -33,6 +36,56 @@ import {
 import { StatusBadge } from "@/components/StatusBadge";
 import { CallSummaryDialog } from "@/components/CallSummaryDialog";
 
+// ── Re-call button ─────────────────────────────────────────────────────────────
+function RecallButton({
+  orderId,
+  status,
+}: {
+  orderId: string;
+  status: string;
+}) {
+  const [loading, setLoading] = useState(false);
+  const isDisabled = status === "CALLING" || status === "CONFIRMED";
+
+  async function handleRecall() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/trigger-call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "Failed to trigger call");
+      }
+      toast.success("Call triggered", { description: `Re-calling for order ${orderId}` });
+    } catch (err) {
+      toast.error("Call failed", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      disabled={isDisabled || loading}
+      onClick={handleRecall}
+      title={isDisabled ? "Cannot re-call: order is already calling or confirmed" : "Re-trigger call"}
+    >
+      {loading ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <PhoneCall className="h-3.5 w-3.5" />
+      )}
+    </Button>
+  );
+}
+
 const columns: ColumnDef<OrderConfirmation>[] = [
   {
     accessorKey: "orderId",
@@ -48,7 +101,12 @@ const columns: ColumnDef<OrderConfirmation>[] = [
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-mono text-sm font-medium">{row.getValue("orderId")}</span>
+      <Link
+        href={`/order/${row.getValue("orderId")}`}
+        className="font-mono text-sm font-medium underline-offset-4 hover:underline"
+      >
+        {row.getValue("orderId")}
+      </Link>
     ),
   },
   {
@@ -133,6 +191,16 @@ const columns: ColumnDef<OrderConfirmation>[] = [
       );
     },
   },
+  {
+    id: "actions",
+    header: "Actions",
+    cell: ({ row }) => (
+      <RecallButton
+        orderId={row.getValue("orderId")}
+        status={row.getValue("status")}
+      />
+    ),
+  },
 ];
 
 interface OrderTableProps {
@@ -149,25 +217,39 @@ const STATUS_OPTIONS: { label: string; value: string }[] = [
   { label: "Failed", value: "FAILED" },
 ];
 
+const PAGE_SIZE = 10;
+
 export function OrderTable({ orders }: OrderTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: "createdAt", desc: true },
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: PAGE_SIZE });
 
   const table = useReactTable({
     data: orders,
     columns,
-    state: { sorting, columnFilters },
+    state: { sorting, columnFilters, pagination },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onPaginationChange: (updater) =>
+      setPagination((prev) => (typeof updater === "function" ? updater(prev) : updater)),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   });
 
   const statusFilter =
     (columnFilters.find((f) => f.id === "status")?.value as string) ?? "ALL";
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  }, [columnFilters]);
+
+  const filteredCount = table.getFilteredRowModel().rows.length;
+  const pageCount = table.getPageCount();
 
   return (
     <div className="space-y-4">
@@ -248,7 +330,9 @@ export function OrderTable({ orders }: OrderTableProps) {
                   colSpan={columns.length}
                   className="h-24 text-center text-muted-foreground"
                 >
-                  No orders found.
+                  {orders.length === 0
+                    ? "No orders yet. Create one above to trigger a confirmation call."
+                    : "No orders match the current filters."}
                 </TableCell>
               </TableRow>
             )}
@@ -256,9 +340,43 @@ export function OrderTable({ orders }: OrderTableProps) {
         </Table>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        Showing {table.getRowModel().rows.length} of {orders.length} orders
-      </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          {filteredCount === 0
+            ? "No orders"
+            : (() => {
+                const { pageIndex, pageSize } = table.getState().pagination;
+                const start = pageIndex * pageSize + 1;
+                const end = Math.min((pageIndex + 1) * pageSize, filteredCount);
+                return `Showing ${start}–${end} of ${filteredCount} orders`;
+              })()}
+        </p>
+        {pageCount > 1 && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {table.getState().pagination.pageIndex + 1} of {pageCount}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

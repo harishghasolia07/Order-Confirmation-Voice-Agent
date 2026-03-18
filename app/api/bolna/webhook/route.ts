@@ -121,16 +121,17 @@ function extractFromTranscript(transcript: unknown): {
 // ─── Webhook Handler ──────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  // Optional bearer-token guard — set BOLNA_WEBHOOK_SECRET in env to enable
+  const webhookSecret = process.env.BOLNA_WEBHOOK_SECRET;
+  if (webhookSecret) {
+    const authHeader = req.headers.get("authorization") ?? "";
+    if (authHeader !== `Bearer ${webhookSecret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
   try {
     const body = (await req.json()) as Record<string, unknown>;
-
-    console.log("[bolna/webhook] Incoming", {
-      status: body?.status,
-      has_transcript: body?.transcript != null,
-      has_extracted_data: body?.extracted_data != null,
-      has_agent_extraction: body?.agent_extraction != null,
-      user_number: body?.user_number,
-    });
 
     const exec = executionPayloadSchema.safeParse(body);
     if (!exec.success) {
@@ -146,7 +147,6 @@ export async function POST(req: NextRequest) {
       "call-disconnected", // wait for "completed" which arrives right after
     ];
     if (ignoredStatuses.includes(d.status)) {
-      console.log(`[bolna/webhook] Ignoring intermediate status: ${d.status}`);
       return NextResponse.json({ success: true, message: `Ignored: ${d.status}` });
     }
 
@@ -185,7 +185,6 @@ export async function POST(req: NextRequest) {
         orderStatus = normalizeStatus(structuredExt.status);
         deliverySlot = structuredExt.delivery_slot ?? undefined;
         callSummary = structuredExt.call_summary ?? undefined;
-        console.log("[bolna/webhook] Status from structured extraction", { orderStatus });
       }
 
       // 2. Parse the JSON block the agent writes in the transcript (primary source)
@@ -195,50 +194,38 @@ export async function POST(req: NextRequest) {
           orderStatus = fromTranscript.status;
           deliverySlot = fromTranscript.delivery_slot;
           callSummary = fromTranscript.call_summary;
-          console.log("[bolna/webhook] Status from transcript JSON block", { orderStatus, callSummary });
         }
       }
 
       if (!orderStatus) {
-        console.log("[bolna/webhook] Completed but could not determine customer response — skipping update");
         return NextResponse.json({ success: true, message: "Completed but no outcome found" });
       }
     } else {
       // no-answer, busy, failed, canceled → mark as FAILED
       orderStatus = "FAILED";
       callSummary = `Call ended with status: ${d.status}`;
-      console.log("[bolna/webhook] Call not answered / failed", { status: d.status });
     }
 
     // ── Resolve orderId if not in context ──────────────────────────────────
     if (!orderId && phoneNumber) {
       const recent = await getRecentCallingOrderByPhone(phoneNumber);
-      if (recent) {
-        orderId = recent.orderId;
-        console.log("[bolna/webhook] Resolved orderId from phone", { phoneNumber, orderId });
-      }
+      if (recent) orderId = recent.orderId;
     }
     if (!orderId) {
       const recent = await getMostRecentCallingOrder();
-      if (recent) {
-        orderId = recent.orderId;
-        console.log("[bolna/webhook] Resolved orderId from most recent CALLING order", { orderId });
-      }
+      if (recent) orderId = recent.orderId;
     }
 
     if (!orderId) {
-      console.warn("[bolna/webhook] Could not resolve orderId — no CALLING order found");
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
     const order = await getOrderByOrderId(orderId);
     if (!order) {
-      console.warn(`[bolna/webhook] Order not in DB: ${orderId}`);
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
     await updateOrderStatus({ orderId, status: orderStatus, deliverySlot, callSummary });
-    console.log("[bolna/webhook] Order updated ✓", { orderId, orderStatus, callSummary });
 
     return NextResponse.json({ success: true });
   } catch (error) {
