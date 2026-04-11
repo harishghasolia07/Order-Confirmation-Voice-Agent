@@ -101,19 +101,22 @@ export function DashboardClient() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+    <div className="min-h-screen bg-background relative overflow-x-hidden selection:bg-primary/30">
+      {/* Background glow for dashboard */}
+      <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] max-w-[800px] max-h-[800px] rounded-full bg-primary/5 blur-[150px] mix-blend-screen pointer-events-none" />
+      
+      <header className="sticky top-0 z-10 border-b border-white/5 bg-background/40 backdrop-blur-2xl supports-backdrop-filter:bg-background/20 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-              <PhoneCall className="h-4 w-4 text-primary-foreground" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-secondary shadow-[0_0_15px_rgba(186,158,255,0.4)]">
+              <PhoneCall className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold leading-none">
-                CODConfirm AI
+              <h1 className="text-xl font-bold leading-none space-grotesk tracking-tight text-foreground">
+                Internal Ops
               </h1>
-              <p className="text-xs text-muted-foreground">
-                AI-powered COD confirmation
+              <p className="text-xs text-muted-foreground mt-0.5 font-medium tracking-wide uppercase">
+                AI Voice Control
               </p>
             </div>
           </div>
@@ -136,12 +139,12 @@ export function DashboardClient() {
 
         <CreateOrderForm onSuccess={handleOrderCreated} />
 
-        <section>
-          <div className="mb-4 flex items-center justify-between">
+        <section className="relative z-10 glass-panel rounded-[2rem] p-8 mt-8">
+          <div className="mb-6 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold">Order Confirmations</h2>
-              <p className="text-sm text-muted-foreground">
-                Customer response (confirm / reschedule / cancel) for each order
+              <h2 className="text-2xl font-bold space-grotesk text-foreground">Order Confirmations</h2>
+              <p className="text-sm text-muted-foreground font-light mt-1">
+                Real-time AI voice confirmation logs and customer intent responses
               </p>
             </div>
             <Button

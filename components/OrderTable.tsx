@@ -264,7 +264,7 @@ export function OrderTable({ orders }: OrderTableProps) {
             onChange={(e) =>
               table.getColumn("orderId")?.setFilterValue(e.target.value)
             }
-            className="pl-8"
+            className="pl-8 bg-black/20 border-white/10 focus-visible:ring-primary text-foreground"
           />
         </div>
         <Select
@@ -276,7 +276,7 @@ export function OrderTable({ orders }: OrderTableProps) {
             ])
           }
         >
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-44 bg-black/20 border-white/10 text-foreground">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
@@ -289,13 +289,13 @@ export function OrderTable({ orders }: OrderTableProps) {
         </Select>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-2xl glass-panel overflow-hidden border-none text-foreground mt-4">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="bg-muted/50">
+              <TableRow key={headerGroup.id} className="bg-white/5 hover:bg-white/5 border-b border-white/10">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead key={header.id} className="text-muted-foreground font-semibold">
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -312,10 +312,10 @@ export function OrderTable({ orders }: OrderTableProps) {
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className="hover:bg-muted/30 transition-colors"
+                  className="hover:bg-white/5 border-white/5 transition-colors group"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="group-hover:text-primary-foreground/90 transition-colors">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
