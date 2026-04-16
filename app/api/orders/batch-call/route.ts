@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { initiateCall } from "@/services/bolna.service";
 
 export async function POST() {
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const pendingOrders = await prisma.orderConfirmation.findMany({
-      where: { status: "PENDING" },
+      where: { userId, status: "PENDING" },
       orderBy: { createdAt: "asc" },
     });
 
@@ -15,7 +21,7 @@ export async function POST() {
 
     // Fire-and-forget all calls in parallel — same pattern as single order creation
     for (const order of pendingOrders) {
-      initiateCall(order.orderId, order.phoneNumber, order.amount).catch(() => {
+      initiateCall(order.orderId, order.phoneNumber, order.amount, userId).catch(() => {
         // Individual failures are handled inside initiateCall (sets status to FAILED)
       });
     }

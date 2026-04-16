@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   updateOrderStatus,
   getOrderByOrderId,
+  getMostRecentOrderByOrderId,
+  getMostRecentCallingOrderByOrderId,
   getRecentCallingOrderByPhone,
   getMostRecentCallingOrder,
 } from "@/services/order.service";
@@ -161,6 +163,11 @@ export async function POST(req: NextRequest) {
     const ctx = d.context_details as Record<string, unknown> | undefined;
     const userData = ctx?.user_data as Record<string, unknown> | undefined;
     const ctxOrderId = String(userData?.order_id ?? ctx?.order_id ?? "");
+    const ctxUserId = String(userData?.user_id ?? userData?.userId ?? "");
+    const contextUserId =
+      ctxUserId && ctxUserId !== "unknown" && ctxUserId !== ""
+        ? ctxUserId
+        : null;
     let orderId: string | null =
       ctxOrderId && ctxOrderId !== "unknown" && ctxOrderId !== "" ? ctxOrderId : null;
 
@@ -220,12 +227,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    const order = await getOrderByOrderId(orderId);
+    let order = null;
+
+    if (contextUserId) {
+      order = await getOrderByOrderId(orderId, contextUserId);
+    }
+
+    if (!order) {
+      order = await getMostRecentCallingOrderByOrderId(orderId);
+    }
+
+    if (!order) {
+      order = await getMostRecentOrderByOrderId(orderId);
+    }
+
+    if (!order && phoneNumber) {
+      order = await getRecentCallingOrderByPhone(phoneNumber, contextUserId ?? undefined);
+    }
+
+    if (!order) {
+      order = await getMostRecentCallingOrder(contextUserId ?? undefined);
+    }
+
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    await updateOrderStatus({ orderId, status: orderStatus, deliverySlot, callSummary });
+    await updateOrderStatus({
+      id: order.id,
+      status: orderStatus,
+      deliverySlot,
+      callSummary,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

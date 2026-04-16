@@ -4,6 +4,7 @@ export interface BolnaCallPayload {
   phoneNumber: string;
   orderId: string;
   amount: number;
+  userId: string;
 }
 
 export interface BolnaCallResponse {
@@ -34,6 +35,7 @@ export async function triggerBolnaCall(
       user_data: {
         order_id: payload.orderId,
         amount: payload.amount,
+        user_id: payload.userId,
       },
     }),
     signal: AbortSignal.timeout(15000),

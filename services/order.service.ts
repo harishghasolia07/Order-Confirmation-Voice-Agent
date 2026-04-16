@@ -2,21 +2,26 @@ import { OrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export interface CreateOrderInput {
+  userId: string;
   orderId: string;
   phoneNumber: string;
   amount: number;
 }
 
-export interface UpdateOrderStatusInput {
-  orderId: string;
+type UpdateOrderStatusTarget =
+  | { id: string }
+  | { userId: string; orderId: string };
+
+export type UpdateOrderStatusInput = UpdateOrderStatusTarget & {
   status: OrderStatus;
   deliverySlot?: string;
   callSummary?: string;
-}
+};
 
 export async function createOrder(input: CreateOrderInput) {
   return prisma.orderConfirmation.create({
     data: {
+      userId: input.userId,
       orderId: input.orderId,
       phoneNumber: input.phoneNumber,
       amount: input.amount,
@@ -25,15 +30,30 @@ export async function createOrder(input: CreateOrderInput) {
   });
 }
 
-export async function getAllOrders() {
+export async function getAllOrders(userId: string) {
   return prisma.orderConfirmation.findMany({
+    where: { userId },
     orderBy: { createdAt: "desc" },
   });
 }
 
-export async function getOrderByOrderId(orderId: string) {
+export async function getOrderByOrderId(orderId: string, userId: string) {
   return prisma.orderConfirmation.findUnique({
+    where: { userId_orderId: { userId, orderId } },
+  });
+}
+
+export async function getMostRecentOrderByOrderId(orderId: string) {
+  return prisma.orderConfirmation.findFirst({
     where: { orderId },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function getMostRecentCallingOrderByOrderId(orderId: string) {
+  return prisma.orderConfirmation.findFirst({
+    where: { orderId, status: "CALLING" },
+    orderBy: { createdAt: "desc" },
   });
 }
 
@@ -43,48 +63,67 @@ function normalizePhone(phone: string): string {
 }
 
 /** Find most recent order in CALLING status for a phone number (fallback when webhook sends order_id unknown). */
-export async function getRecentCallingOrderByPhone(phoneNumber: string) {
+export async function getRecentCallingOrderByPhone(
+  phoneNumber: string,
+  userId?: string
+) {
   const normalized = normalizePhone(phoneNumber);
   const calling = await prisma.orderConfirmation.findMany({
-    where: { status: "CALLING" },
+    where: {
+      status: "CALLING",
+      ...(userId ? { userId } : {}),
+    },
     orderBy: { createdAt: "desc" },
   });
   return calling.find((o) => normalizePhone(o.phoneNumber) === normalized) ?? null;
 }
 
 /** Find single most recent order in CALLING status (fallback when webhook sends order_id unknown and no phone). */
-export async function getMostRecentCallingOrder() {
+export async function getMostRecentCallingOrder(userId?: string) {
   return prisma.orderConfirmation.findFirst({
-    where: { status: "CALLING" },
+    where: {
+      status: "CALLING",
+      ...(userId ? { userId } : {}),
+    },
     orderBy: { createdAt: "desc" },
   });
 }
 
 export async function updateOrderStatus(input: UpdateOrderStatusInput) {
+  const data = {
+    status: input.status,
+    ...(input.deliverySlot !== undefined && {
+      deliverySlot: input.deliverySlot,
+    }),
+    ...(input.callSummary !== undefined && {
+      callSummary: input.callSummary,
+    }),
+  };
+
+  if ("id" in input) {
+    return prisma.orderConfirmation.update({
+      where: { id: input.id },
+      data,
+    });
+  }
+
   return prisma.orderConfirmation.update({
-    where: { orderId: input.orderId },
-    data: {
-      status: input.status,
-      ...(input.deliverySlot !== undefined && {
-        deliverySlot: input.deliverySlot,
-      }),
-      ...(input.callSummary !== undefined && {
-        callSummary: input.callSummary,
-      }),
-    },
+    where: { userId_orderId: { userId: input.userId, orderId: input.orderId } },
+    data,
   });
 }
 
-export async function getAnalytics() {
+export async function getAnalytics(userId: string) {
   const startOfToday = new Date();
   startOfToday.setUTCHours(0, 0, 0, 0);
 
   const [orders, todayOrders] = await Promise.all([
     prisma.orderConfirmation.findMany({
+      where: { userId },
       select: { status: true, amount: true },
     }),
     prisma.orderConfirmation.findMany({
-      where: { createdAt: { gte: startOfToday } },
+      where: { userId, createdAt: { gte: startOfToday } },
       select: { status: true },
     }),
   ]);

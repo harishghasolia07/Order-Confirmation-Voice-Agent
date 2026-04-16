@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { createOrder, getAllOrders } from "@/services/order.service";
 import { initiateCall } from "@/services/bolna.service";
@@ -16,6 +17,11 @@ const createOrderSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     const parsed = createOrderSchema.safeParse(body);
 
@@ -28,9 +34,9 @@ export async function POST(req: NextRequest) {
 
     const { orderId, phoneNumber, amount } = parsed.data;
 
-    const order = await createOrder({ orderId, phoneNumber, amount });
+    const order = await createOrder({ userId, orderId, phoneNumber, amount });
 
-    initiateCall(orderId, phoneNumber, amount).catch((err) => {
+    initiateCall(orderId, phoneNumber, amount, userId).catch((err) => {
       console.error(`[trigger-call] Failed for order ${orderId}:`, err);
     });
 
@@ -55,7 +61,12 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
-    const orders = await getAllOrders();
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const orders = await getAllOrders(userId);
     return NextResponse.json(orders);
   } catch (error) {
     console.error("[GET /api/orders]", error);

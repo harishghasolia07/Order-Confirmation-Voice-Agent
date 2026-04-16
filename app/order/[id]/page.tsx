@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
 import { getOrderByOrderId } from "@/services/order.service";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RecallButton } from "@/components/RecallButton";
@@ -25,7 +26,12 @@ export async function generateMetadata({ params }: OrderDetailPageProps) {
 
 export default async function OrderDetailPage({ params }: OrderDetailPageProps) {
   const { id } = await params;
-  const order = await getOrderByOrderId(id);
+  const { userId } = await auth();
+  if (!userId) {
+    notFound();
+  }
+
+  const order = await getOrderByOrderId(id, userId);
 
   if (!order) {
     notFound();

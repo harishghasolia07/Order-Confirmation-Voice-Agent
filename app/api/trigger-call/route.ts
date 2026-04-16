@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { initiateCall } from "@/services/bolna.service";
 import { getOrderByOrderId } from "@/services/order.service";
@@ -9,6 +10,11 @@ const triggerCallSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     const parsed = triggerCallSchema.safeParse(body);
 
@@ -20,7 +26,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { orderId } = parsed.data;
-    const order = await getOrderByOrderId(orderId);
+    const order = await getOrderByOrderId(orderId, userId);
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -33,7 +39,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await initiateCall(order.orderId, order.phoneNumber, order.amount);
+    await initiateCall(order.orderId, order.phoneNumber, order.amount, userId);
 
     return NextResponse.json({ success: true, orderId });
   } catch (error: unknown) {
